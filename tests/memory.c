@@ -57,7 +57,7 @@ int main(int argc, char** argv)
   ph_unused_parameter(argc);
   ph_unused_parameter(argv);
 
-  plan_tests(46);
+  plan_tests(49);
 
   ph_memtype_def_t defs[] = {
     { "memtest1", "widget", sizeof(struct widget), PH_MEM_FLAGS_ZERO },
@@ -157,6 +157,32 @@ int main(int argc, char** argv)
   is(0, st.bytes);
   is(3, st.frees);
   is(1, st.reallocs);
+
+  const int preallocated_widgets = 4;
+  struct widget *widgets[preallocated_widgets * 2];
+  is(PH_OK, ph_mem_preallocate(types[0], preallocated_widgets));
+  is(PH_EXISTS, ph_mem_preallocate(types[0], preallocated_widgets));
+
+  for (i = 0; i < sizeof(widgets)/sizeof(struct widget*); i++) {
+    widgets[i] = ph_mem_alloc(types[0]);
+    widgets[i]->aval++; //Let's make sure we've gotten good memory.
+  }
+  
+  for (i = 0; i < sizeof(widgets)/sizeof(struct widget*); i++) {
+    ph_mem_free(types[0], widgets[i]);
+  }
+
+  w=ph_mem_alloc(types[0]);
+  w->aval++; //Same as above
+  bool found=false;
+  for (i = 0; i < preallocated_widgets; i++) {
+    if (w == widgets[i]) {
+      found = true;
+      break;
+    }
+  }
+  is(true, found);
+  ph_mem_free(types[0], w);
 
   dump_mem_stats();
 

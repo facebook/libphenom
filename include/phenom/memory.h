@@ -116,6 +116,11 @@ ph_memtype_t ph_memtype_register_block(
     const ph_memtype_def_t *defs,
     ph_memtype_t *types);
 
+/** Preallocates number_preallocated items of the memory type
+ * number_preallocated must be a power of two greater than or equal to four
+ * it is an error to call this function more than once for a memtype or on a memtype with an item_size of 0 */
+ph_result_t ph_mem_preallocate(ph_memtype_t memtype, unsigned number_preallocated);
+
 /** Allocates a fixed-size memory chunk
  *
  * Given a memory type, allocates a block of memory of its defined
