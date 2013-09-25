@@ -96,6 +96,17 @@ static void memory_init(void)
   atexit(memory_destroy);
 }
 
+static void* memory_grow(void)
+{
+  if (memtypes_size > 0x7fffffff) {
+    return NULL;
+  }
+  memtypes_size *= 2;
+  
+  memtypes = realloc(memtypes, memtypes_size * sizeof(*memtypes));
+  return memtypes;
+}
+
 static ph_counter_scope_t *resolve_facility(const char *fac)
 {
   ph_counter_scope_t *scope;
@@ -131,8 +142,9 @@ ph_memtype_t ph_memtype_register(const ph_memtype_def_t *def)
   }
 
   if ((uint32_t)next_memtype + 1 >= memtypes_size) {
-    // TODO: grow the array
-    return PH_MEMTYPE_INVALID;
+    if (!memory_grow()) {
+        return PH_MEMTYPE_INVALID;
+    }
   }
 
   mt = ck_pr_faa_int(&next_memtype, 1);
@@ -181,8 +193,9 @@ ph_memtype_t ph_memtype_register_block(
   }
 
   if ((uint32_t)next_memtype + num_types >= memtypes_size) {
-    // TODO: grow the array
-    return PH_MEMTYPE_INVALID;
+    if (!memory_grow()) {
+        return PH_MEMTYPE_INVALID;
+    }
   }
 
   fac_scope = resolve_facility(defs[0].facility);
