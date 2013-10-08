@@ -466,31 +466,22 @@ ph_string_t *ph_string_make_cstr(ph_memtype_t mt, const char *str)
   return ph_string_make_copy(mt, str, strlen(str), 0);
 }
 
-/* ph_string_reverse Function reverses the string which is passed to it as an argument */
-
-ph_string_t *ph_string_reverse(ph_string_t *str)
+void ph_string_reverse(ph_string_t *str)
 {
-  
-  uint32_t i=0;
-  uint32_t j=(str->len)-1;
+  uint32_t i = 0;
+  uint32_t j = str->len - 1;
   char temp;
   
-  if(str->len==0)
-  {
-    return(str);
+  if (str->len == 0){
+    return;
   }
   
-  while(i<j)
-  {
-    
-    temp=str->buf[i];
-    str->buf[i]=str->buf[j];
-    str->buf[j]=temp;
-    i++;
-    j--;
+  while (i < j ){
+    temp = str->buf[i];
+    str->buf[i] = str->buf[j];
+    str->buf[j] = temp;
   }
-  
-  return(str);
+  return;
 }
 
 /* vim:ts=2:sw=2:et:
