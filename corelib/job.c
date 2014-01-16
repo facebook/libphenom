@@ -311,8 +311,8 @@ void ph_job_pool_shutdown(void)
     ph_thread_pool_wait_stop(pool);
 
     for (i = 0; i < MAX_RINGS + 1; i++) {
-      if (pool->rings[i]) {
-        ph_mem_free(mt.ringbuf, pool->rings[i]);
+      if (pool->ringbufs[i]) {
+        ph_mem_free(mt.ringbuf, pool->ringbufs[i]);
       }
     }
 
@@ -337,7 +337,8 @@ static inline ph_job_t *pop_job(ph_thread_pool_t *pool,
 
   for (;;) {
     // Try the my own bucket first, as this is lowest contention
-    if (ck_ring_dequeue_spmc(pool->rings[mybucket], &job)) {
+    if (ck_ring_dequeue_spmc(&pool->rings[mybucket], pool->ringbufs[mybucket],
+          &job)) {
       return job;
     }
 
@@ -349,7 +350,7 @@ static inline ph_job_t *pop_job(ph_thread_pool_t *pool,
         break;
       }
       i--;
-      if (ck_ring_dequeue_spmc(pool->rings[i], &job)) {
+      if (ck_ring_dequeue_spmc(&pool->rings[i], pool->ringbufs[i], &job)) {
         return job;
       }
       bits &= ~(1ULL << i);
@@ -373,20 +374,20 @@ static inline ph_job_t *pop_job(ph_thread_pool_t *pool,
   }
 }
 
-#define should_init_ring(pool, bucket) ph_unlikely(pool->rings[bucket] == NULL)
+#define should_init_ring(pool, bucket) \
+  ph_unlikely(pool->ringbufs[bucket] == NULL)
 static void init_ring(ph_thread_pool_t *pool, int bucket)
 {
   uint32_t ring_size;
-  char *ringbuf;
   intptr_t mask;
 
   ring_size = MAX(4, ph_power_2(pool->max_queue_len));
 
-  pool->rings[bucket] = ph_mem_alloc_size(
-      mt.ringbuf, sizeof(ck_ring_t) + (ring_size * sizeof(void*)));
+  // init the actual buffer following the power-of-two rule
+  pool->ringbufs[bucket] = ph_mem_alloc_size(mt.ringbuf,
+    ring_size * sizeof(void*));
 
-  ringbuf = (char*)(pool->rings[bucket] + 1);
-  ck_ring_init(pool->rings[bucket], ringbuf, ring_size);
+  ck_ring_init(&pool->rings[bucket], ring_size);
 
   mask = 1ULL << bucket;
 #if defined(__APPLE__) || defined(__clang__)
@@ -536,7 +537,8 @@ static inline void do_set_pool(ph_job_t *job, ph_thread_t *me)
     if (should_init_ring(pool, MAX_RINGS)) {
       init_ring(pool, MAX_RINGS);
     }
-    while (!ck_ring_enqueue_spmc(pool->rings[MAX_RINGS], job)) {
+    while (!ck_ring_enqueue_spmc(&pool->rings[MAX_RINGS],
+           pool->ringbufs[MAX_RINGS], job)) {
       ck_spinlock_unlock(&pool->lock);
       ph_counter_block_add(cblock, SLOT_PRODUCER_SLEEP, 1);
       wait_pool(&pool->producer);
@@ -547,7 +549,8 @@ static inline void do_set_pool(ph_job_t *job, ph_thread_t *me)
     if (should_init_ring(pool, me->tid)) {
       init_ring(pool, me->tid);
     }
-    while (ph_unlikely(!ck_ring_enqueue_spmc(pool->rings[me->tid], job))) {
+    while (ph_unlikely(!ck_ring_enqueue_spmc(&pool->rings[me->tid],
+           pool->ringbufs[me->tid], job))) {
       ph_counter_block_add(cblock, SLOT_PRODUCER_SLEEP, 1);
       wait_pool(&pool->producer);
     }

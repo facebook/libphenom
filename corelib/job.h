@@ -95,7 +95,8 @@ struct ph_thread_pool {
 
   uint32_t max_queue_len;
 
-  ck_ring_t *rings[MAX_RINGS+1];
+  ck_ring_t rings[MAX_RINGS+1];
+  ck_ring_buffer_t *ringbufs[MAX_RINGS+1];
   intptr_t used_rings;
 
   ck_spinlock_t lock CK_CC_CACHELINE;
