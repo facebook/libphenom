@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013 Samy Al Bahra.
+ * Copyright 2011-2014 Samy Al Bahra.
  * Copyright 2011 David Joseph.
  * All rights reserved.
  *
@@ -84,20 +84,27 @@ ck_internal_max_32(uint32_t x, uint32_t y)
 CK_CC_INLINE static unsigned long
 ck_internal_bsf(unsigned long v)
 {
+#if defined(__GNUC__)
+	return __builtin_ffs(v);
+#else
 	unsigned int i;
 	const unsigned int s = sizeof(unsigned long) * 8 - 1;
 
 	for (i = 0; i < s; i++) {
 		if (v & (1UL << (s - i)))
-			return i;
+			return sizeof(unsigned long) * 8 - i;
 	}
 
 	return 1;
+#endif /* !__GNUC__ */
 }
 
 CK_CC_INLINE static uint64_t
 ck_internal_bsf_64(uint64_t v)
 {
+#if defined(__GNUC__)
+	return __builtin_ffs(v);
+#else
 	unsigned int i;
 	const unsigned int s = sizeof(unsigned long) * 8 - 1;
 
@@ -105,6 +112,8 @@ ck_internal_bsf_64(uint64_t v)
 		if (v & (1ULL << (63U - i)))
 			return i;
 	}
+#endif /* !__GNUC__ */
 
 	return 1;
 }
+

@@ -1,6 +1,6 @@
 /*
  * Copyright 2013 John Wittrock.
- * Copyright 2013 Samy Al Bahra.
+ * Copyright 2013-2014 Samy Al Bahra.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -62,7 +62,8 @@ ck_pflock_init(struct ck_pflock *pf)
 	pf->rout = 0;
 	pf->win = 0;
 	pf->wout = 0;
-	ck_pr_fence_memory();
+	ck_pr_fence_store();
+
 	return;
 }
 
@@ -70,7 +71,7 @@ CK_CC_INLINE static void
 ck_pflock_write_unlock(ck_pflock_t *pf)
 {
 
-	ck_pr_fence_memory();
+	ck_pr_fence_release();
 
 	/* Migrate from write phase to read phase. */
 	ck_pr_and_32(&pf->rin, CK_PFLOCK_LSB);
@@ -102,7 +103,7 @@ ck_pflock_write_lock(ck_pflock_t *pf)
 	while (ck_pr_load_32(&pf->rout) != ticket)
 		ck_pr_stall();
 
-	ck_pr_fence_memory();
+	ck_pr_fence_acquire();
 	return;
 }
 
@@ -110,7 +111,7 @@ CK_CC_INLINE static void
 ck_pflock_read_unlock(ck_pflock_t *pf)
 {
 
-	ck_pr_fence_load();
+	ck_pr_fence_load_atomic();
 	ck_pr_faa_32(&pf->rout, CK_PFLOCK_RINC);
 	return;
 }
@@ -133,7 +134,7 @@ ck_pflock_read_lock(ck_pflock_t *pf)
 		ck_pr_stall();
 
 leave:
-	/* Acquire semantics. */
+	/* Acquire semantics with respect to readers. */
 	ck_pr_fence_load();
 	return;
 }

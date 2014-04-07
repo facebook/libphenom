@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2013 Samy Al Bahra.
+ * Copyright 2012-2014 Samy Al Bahra.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,6 +32,7 @@
 
 struct ck_malloc {
 	void *(*malloc)(size_t);
+	void *(*realloc)(void *, size_t, size_t, bool);
 	void (*free)(void *, size_t, bool);
 };
 

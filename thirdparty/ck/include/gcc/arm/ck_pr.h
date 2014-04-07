@@ -1,6 +1,6 @@
 /*
- * Copyright 2009-2013 Samy Al Bahra.
- * Copyright 2013 Olivier Houchard.
+ * Copyright 2009-2014 Samy Al Bahra.
+ * Copyright 2013-2014 Olivier Houchard.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -54,17 +54,26 @@ ck_pr_stall(void)
 	return;
 }
 
-/* 
- * isb, dsb and dmb instructions only appeared with armv7, so use the old
- * notation
- */
-
-#define _ISB \
+#if defined(__ARM_ARCH_7__) || defined(__ARM_ARCH_7A__)
+#define __CK_ISB __asm __volatile("isb" : : "r" (0) : "memory")
+#define _CK_DMB __asm __volatile("dmb" : : "r" (0) : "memory")
+#define _CK_DSB __asm __volatile("dsb" : : "r" (0) : "memory")
+/* FreeBSD's toolchain doesn't accept dmb st, so use the opcode instead */
+#ifdef __FreeBSD__
+#define _CK_DMB_ST __asm __volatile(".word 0xf57ff05e" : : "r" (0) : "memory")
+#else
+#define _CK_DMB_ST __asm __volatile("dmb st" : : "r" (0) : "memory")
+#endif /* __FreeBSD__ */
+#else
+/* armv6 doesn't have dsb/dmb/isb, and no way to wait only for stores */
+#define _CK_ISB \
     __asm __volatile("mcr p15, 0, %0, c7, c5, 4" : : "r" (0) : "memory")
-#define _DSB \
+#define _CK_DSB \
     __asm __volatile("mcr p15, 0, %0, c7, c10, 4" : : "r" (0) : "memory")
-#define _DMB  \
+#define _CK_DMB  \
     __asm __volatile("mcr p15, 0, %0, c7, c10, 5" : : "r" (0) : "memory")
+#define _CK_DMB_ST _CK_DMB
+#endif
 
 #define CK_PR_FENCE(T, I)				\
 	CK_CC_INLINE static void			\
@@ -73,22 +82,25 @@ ck_pr_stall(void)
 		I;					\
 	}
 
-CK_PR_FENCE(atomic, _DMB)
-CK_PR_FENCE(atomic_store, _DMB)
-CK_PR_FENCE(atomic_load, _DMB)
-CK_PR_FENCE(store_atomic, _DMB)
-CK_PR_FENCE(load_atomic, _DMB)
-CK_PR_FENCE(store, _DMB)
-CK_PR_FENCE(store_load, _DMB)
-CK_PR_FENCE(load, _DMB)
-CK_PR_FENCE(load_store, _DMB)
-CK_PR_FENCE(memory, _DMB)
+CK_PR_FENCE(atomic, _CK_DMB_ST)
+CK_PR_FENCE(atomic_store, _CK_DMB_ST)
+CK_PR_FENCE(atomic_load, _CK_DMB_ST)
+CK_PR_FENCE(store_atomic, _CK_DMB_ST)
+CK_PR_FENCE(load_atomic, _CK_DMB)
+CK_PR_FENCE(store, _CK_DMB_ST)
+CK_PR_FENCE(store_load, _CK_DMB_ST)
+CK_PR_FENCE(load, _CK_DMB)
+CK_PR_FENCE(load_store, _CK_DMB)
+CK_PR_FENCE(memory, _CK_DMB)
+CK_PR_FENCE(acquire, _CK_DMB)
+CK_PR_FENCE(release, _CK_DMB)
 
 #undef CK_PR_FENCE
 
-#undef _ISB
-#undef _DSB
-#undef _DMB
+#undef _CK_ISB
+#undef _CK_DSB
+#undef _CK_DMB
+#undef _CK_DMB_ST
 
 #define CK_PR_LOAD(S, M, T, C, I)				\
 	CK_CC_INLINE static T					\
@@ -117,6 +129,17 @@ CK_PR_LOAD_S(char, char, "ldrb")
 #undef CK_PR_LOAD_S
 #undef CK_PR_LOAD
 
+CK_CC_INLINE static uint64_t
+ck_pr_load_64(const uint64_t *target)
+{
+	register uint64_t ret asm("r0");
+
+	__asm __volatile("ldrd %0, [%1]" : "+r" (ret)
+	    				 : "r" (target) 
+					 : "memory", "cc");
+	return (ret);
+}
+
 #define CK_PR_STORE(S, M, T, C, I)				\
 	CK_CC_INLINE static void				\
 	ck_pr_store_##S(M *target, T v)				\
@@ -144,6 +167,86 @@ CK_PR_STORE_S(char, char, "strb")
 #undef CK_PR_STORE_S
 #undef CK_PR_STORE
 
+CK_CC_INLINE static void
+ck_pr_store_64(const uint64_t *target, uint64_t value)
+{
+	register uint64_t tmp asm("r0") = value;
+
+	__asm __volatile("strd %0, [%1]"
+				:
+				: "r" (tmp), "r" (target)
+				: "memory", "cc");
+}
+
+CK_CC_INLINE static bool
+ck_pr_cas_64_value(uint64_t *target, uint64_t compare, uint64_t set, uint64_t *value)
+{
+	register uint64_t __compare asm("r0") = compare;
+	register uint64_t __set asm("r2") = set;
+
+	__asm__ __volatile__("1:"
+			     "ldrexd r4, [%3];"
+			     "cmp    r4, r0;"
+			     "ittt eq;"
+			     "cmpeq  r5, r1;"
+			     "strexdeq r6, r2, [%3];"
+			     "cmpeq  r6, #1;"
+			     "beq 1b;"
+			     "strd r4, [%0];"
+				: "+r" (value)
+				: "r" (__compare), "r" (__set) ,
+				  "r"(target)
+				: "memory", "cc", "r4", "r5", "r6");
+	return (*value == compare);
+}
+
+CK_CC_INLINE static bool
+ck_pr_cas_ptr_2_value(void *target, void *compare, void *set, void *value)
+{
+	uint32_t *_compare = compare;
+	uint32_t *_set = set;
+	uint64_t __compare = ((uint64_t)_compare[0]) | ((uint64_t)_compare[1] << 32);
+	uint64_t __set = ((uint64_t)_set[0]) | ((uint64_t)_set[1] << 32);
+
+	return (ck_pr_cas_64_value(target, __compare, __set, value));
+}
+
+
+CK_CC_INLINE static bool
+ck_pr_cas_64(uint64_t *target, uint64_t compare, uint64_t set)
+{
+	register uint64_t __compare asm("r0") = compare;
+	register uint64_t __set asm("r2") = set;
+	int ret;
+
+	__asm__ __volatile__("1:"
+			     "mov %0, #0;"
+			     "ldrexd r4, [%3];"
+			     "cmp    r4, r0;"
+			     "itttt eq;"
+			     "cmpeq  r5, r1;"
+			     "strexdeq r6, r2, [%3];"
+			     "moveq %0, #1;"
+			     "cmpeq  r6, #1;"
+			     "beq 1b;"
+			     : "=&r" (ret)
+			     : "r" (__compare), "r" (__set) ,
+			       "r"(target)
+			     : "memory", "cc", "r4", "r5", "r6");
+
+	return (ret);
+}
+
+CK_CC_INLINE static bool
+ck_pr_cas_ptr_2(void *target, void *compare, void *set)
+{
+	uint32_t *_compare = compare;
+	uint32_t *_set = set;
+	uint64_t __compare = ((uint64_t)_compare[0]) | ((uint64_t)_compare[1] << 32);
+	uint64_t __set = ((uint64_t)_set[0]) | ((uint64_t)_set[1] << 32);
+	return (ck_pr_cas_64(target, __compare, __set));
+}
+
 CK_CC_INLINE static bool
 ck_pr_cas_ptr_value(void *target, void *compare, void *set, void *value)
 {
@@ -151,6 +254,7 @@ ck_pr_cas_ptr_value(void *target, void *compare, void *set, void *value)
 	__asm__ __volatile__("1:"
 			     "ldrex %0, [%2];"
 			     "cmp   %0, %4;"
+			     "itt eq;"
 			     "strexeq %1, %3, [%2];"
 			     "cmpeq   %1, #1;"
 			     "beq   1b;"
@@ -171,6 +275,7 @@ ck_pr_cas_ptr(void *target, void *compare, void *set)
 	__asm__ __volatile__("1:"
 			     "ldrex %0, [%2];"
 			     "cmp   %0, %4;"
+			     "itt eq;"
 			     "strexeq %1, %3, [%2];"
 			     "cmpeq   %1, #1;"
 			     "beq   1b;"
@@ -191,6 +296,7 @@ ck_pr_cas_ptr(void *target, void *compare, void *set)
 		__asm__ __volatile__("1:"				\
 				     "ldrex" W " %0, [%2];"		\
 				     "cmp   %0, %4;"			\
+				     "itt eq;"				\
 				     "strex" W "eq %1, %3, [%2];"	\
 		    		     "cmpeq   %1, #1;"			\
 				     "beq   1b;"			\
@@ -214,8 +320,9 @@ ck_pr_cas_ptr(void *target, void *compare, void *set)
 		__asm__ __volatile__("1:"				\
 				     "ldrex" W " %0, [%2];"		\
 				     "cmp   %0, %4;"			\
+				     "itt eq;"				\
 				     "strex" W "eq %1, %3, [%2];"	\
-				     "cmp   %1, #1;"			\
+				     "cmpeq   %1, #1;"			\
 				     "beq   1b;"			\
 					: "+&r" (previous),		\
 		    			  "+&r" (tmp)			\

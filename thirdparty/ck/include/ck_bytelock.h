@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Samy Al Bahra.
+ * Copyright 2010-2014 Samy Al Bahra.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -67,11 +67,11 @@ ck_bytelock_init(struct ck_bytelock *bytelock)
 }
 
 #ifdef CK_F_PR_LOAD_64
-#define CK_BYTELOCK_LENGTH 8
+#define CK_BYTELOCK_LENGTH sizeof(uint64_t)
 #define CK_BYTELOCK_LOAD ck_pr_load_64
 #define CK_BYTELOCK_TYPE uint64_t
 #elif defined(CK_F_PR_LOAD_32)
-#define CK_BYTELOCK_LENGTH 16
+#define CK_BYTELOCK_LENGTH sizeof(uint32_t)
 #define CK_BYTELOCK_LOAD ck_pr_load_32
 #define CK_BYTELOCK_TYPE uint32_t
 #else
@@ -89,7 +89,7 @@ ck_bytelock_write_lock(struct ck_bytelock *bytelock, unsigned int slot)
 		ck_pr_stall();
 
 	/* If we are slotted, we might be upgrading from a read lock. */
-	if (slot < sizeof bytelock->readers)
+	if (slot <= sizeof bytelock->readers)
 		ck_pr_store_8(&bytelock->readers[slot - 1], false);
 
 	/* Wait for slotted readers to drain out. */
@@ -114,7 +114,7 @@ CK_CC_INLINE static void
 ck_bytelock_write_unlock(struct ck_bytelock *bytelock)
 {
 
-	ck_pr_fence_memory();
+	ck_pr_fence_release();
 	ck_pr_store_uint(&bytelock->owner, 0);
 	return;
 }
@@ -173,13 +173,12 @@ CK_CC_INLINE static void
 ck_bytelock_read_unlock(struct ck_bytelock *bytelock, unsigned int slot)
 {
 
-	ck_pr_fence_memory();
+	ck_pr_fence_release();
 
-	slot -= 1;
 	if (slot > sizeof bytelock->readers)
 		ck_pr_dec_uint(&bytelock->n_readers);
 	else
-		ck_pr_store_8(&bytelock->readers[slot], false);
+		ck_pr_store_8(&bytelock->readers[slot - 1], false);
 
 	return;
 }

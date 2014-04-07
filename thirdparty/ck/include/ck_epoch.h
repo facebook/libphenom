@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013 Samy Al Bahra.
+ * Copyright 2011-2014 Samy Al Bahra.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -100,8 +100,15 @@ ck_epoch_begin(ck_epoch_t *epoch, ck_epoch_record_t *record)
 		 * For this reason, store to load serialization is necessary.
 		 */
 		ck_pr_store_uint(&record->epoch, g_epoch);
+
+#if defined(__x86__) || defined(__x86_64__)
+		ck_pr_fas_uint(&record->active, 1);
+		ck_pr_fence_atomic_load();
+#else
 		ck_pr_store_uint(&record->active, 1);
 		ck_pr_fence_store_load();
+#endif
+
 		return;
 	}
 
@@ -118,7 +125,7 @@ ck_epoch_end(ck_epoch_t *global, ck_epoch_record_t *record)
 
 	(void)global;
 
-	ck_pr_fence_memory();
+	ck_pr_fence_release();
 	ck_pr_store_uint(&record->active, record->active - 1);
 	return;
 }

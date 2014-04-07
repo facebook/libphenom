@@ -5,7 +5,6 @@ pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libphenom.pc
 
 ck_SOURCES = \
-	thirdparty/ck/src/ck_bag.c \
 	thirdparty/ck/src/ck_barrier_centralized.c \
 	thirdparty/ck/src/ck_barrier_combining.c \
 	thirdparty/ck/src/ck_barrier_dissemination.c \

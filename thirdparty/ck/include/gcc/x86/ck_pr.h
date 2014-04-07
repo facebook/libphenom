@@ -1,5 +1,5 @@
 /*
- * Copyright 2009-2013 Samy Al Bahra.
+ * Copyright 2009-2014 Samy Al Bahra.
  * Copyright 2011 Devon H. O'Dell <devon.odell@gmail.com>
  * All rights reserved.
  *
@@ -80,6 +80,8 @@ CK_PR_FENCE(load_store, "mfence")
 CK_PR_FENCE(store, "sfence")
 CK_PR_FENCE(store_load, "mfence")
 CK_PR_FENCE(memory, "mfence")
+CK_PR_FENCE(release, "mfence")
+CK_PR_FENCE(acquire, "mfence")
 
 #undef CK_PR_FENCE
 

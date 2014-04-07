@@ -1,5 +1,5 @@
 /*
- * Copyright 2010-2013 Samy Al Bahra.
+ * Copyright 2010-2014 Samy Al Bahra.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -58,7 +58,7 @@ ck_sequence_read_begin(struct ck_sequence *sq)
 		 * If a sequence is even then associated data may be in a
 		 * consistent state.
 		 */
-		if ((version & 1) == 0)
+		if (CK_CC_LIKELY((version & 1) == 0))
 			break;
 
 		/*

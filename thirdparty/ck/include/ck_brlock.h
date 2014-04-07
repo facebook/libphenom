@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2013 Samy Al Bahra.
+ * Copyright 2011-2014 Samy Al Bahra.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -67,7 +67,7 @@ ck_brlock_init(struct ck_brlock *br)
 
 	br->readers = NULL;
 	br->writer = false;
-	ck_pr_fence_memory();
+	ck_pr_fence_store();
 	return;
 }
 
@@ -91,7 +91,7 @@ ck_brlock_write_lock(struct ck_brlock *br)
 			ck_pr_stall();
 	}
 
-	/* This branch should never be reached. */
+	/* Already acquired with respect to other writers. */
 	return;
 }
 
@@ -99,7 +99,7 @@ CK_CC_INLINE static void
 ck_brlock_write_unlock(struct ck_brlock *br)
 {
 
-	ck_pr_fence_memory();
+	ck_pr_fence_release();
 	ck_pr_store_uint(&br->writer, false);
 	return;
 }
@@ -134,6 +134,7 @@ ck_brlock_write_trylock(struct ck_brlock *br, unsigned int factor)
 		}
 	}
 
+	/* Already acquired with respect to other writers. */
 	return true;
 }
 
@@ -270,7 +271,7 @@ CK_CC_INLINE static void
 ck_brlock_read_unlock(struct ck_brlock_reader *reader)
 {
 
-	ck_pr_fence_load();
+	ck_pr_fence_load_store();
 	ck_pr_store_uint(&reader->n_readers, reader->n_readers - 1);
 	return;
 }
