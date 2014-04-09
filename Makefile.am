@@ -4,18 +4,6 @@ lib_LTLIBRARIES = libphenom.la
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libphenom.pc
 
-ck_SOURCES = \
-	thirdparty/ck/src/ck_bag.c \
-	thirdparty/ck/src/ck_barrier_centralized.c \
-	thirdparty/ck/src/ck_barrier_combining.c \
-	thirdparty/ck/src/ck_barrier_dissemination.c \
-	thirdparty/ck/src/ck_barrier_mcs.c \
-	thirdparty/ck/src/ck_barrier_tournament.c \
-	thirdparty/ck/src/ck_epoch.c \
-	thirdparty/ck/src/ck_hp.c \
-	thirdparty/ck/src/ck_hs.c \
-	thirdparty/ck/src/ck_ht.c
-
 libphenom_la_CPPFLAGS = \
 	-Ithirdparty/ck/include -Iinclude -I$(top_srcdir)\
 	-DPHENOM_IMPL=1
@@ -65,20 +53,18 @@ libphenom_la_SOURCES = \
 	corelib/streams/write.c \
 	corelib/streams/fd.c \
 	corelib/streams/string.c \
-	corelib/streams/temp.c \
-	$(ck_SOURCES)
+	corelib/streams/temp.c
 
 if GIMLI
 gimli_libphenom_la_LDFLAGS = -module
 gimli_libphenom_la_CPPFLAGS = \
-	-Ithirdparty/ck/include -Iinclude -I$(top_srcdir)\
+	-Iinclude -I$(top_srcdir)\
 	-DPHENOM_IMPL=1
 gimli_libphenom_la_CFLAGS = @IRONMANCFLAGS@
 gimli_libphenom_la_LIBADD = libphenom.la
 gimli_libphenom_la_SOURCES = \
 	corelib/gimli/boot.c \
 	corelib/gimli/counter.c \
-	corelib/gimli/ck_hs.c \
 	corelib/gimli/log.c \
 	corelib/gimli/thread.c \
 	corelib/gimli/sockaddr.c
@@ -93,7 +79,7 @@ noinst_LIBRARIES = libtap.a
 libtap_a_CPPFLAGS = -Iinclude
 libtap_a_SOURCES = thirdparty/tap/tap.c
 
-TEST_CPPFLAGS = -Ithirdparty/tap -Ithirdparty/ck/include -Iinclude -DPHENOM_IMPL
+TEST_CPPFLAGS = -Ithirdparty/tap -Iinclude -DPHENOM_IMPL
 TEST_LDADD = libphenom.la libtap.a
 # don't drive me mad when I'm tab completing
 TEST_SUITE_LOG = tests/suite.log
@@ -128,12 +114,10 @@ check-lint:
 install-phenom-hdrs:
 	$(mkdir_p) "$(DESTDIR)$(includedir)/phenom"
 	$(INSTALL_HEADER) include/phenom/*.h $(DESTDIR)$(includedir)/phenom
-	$(INSTALL_HEADER) thirdparty/ck/include/ck_*.h $(DESTDIR)$(includedir)
+	$(INSTALL_HEADER) $(DESTDIR)$(includedir)
 	$(mkdir_p) "$(DESTDIR)$(includedir)/gcc"
-	$(INSTALL_HEADER) thirdparty/ck/include/gcc/*.h $(DESTDIR)$(includedir)/gcc
 	for a in arm ppc ppc64 sparcv9 x86 x86_64 ; do \
 		$(mkdir_p) "$(DESTDIR)$(includedir)/gcc/$$a" ; \
-		$(INSTALL_HEADER) thirdparty/ck/include/gcc/$$a/*.h $(DESTDIR)$(includedir)/gcc/$$a ; \
 	done
 
 clean-docs:
@@ -202,7 +186,7 @@ tests_bench_iopipes_t_LDADD = $(TEST_LDADD) $(LIBEVENT)
 
 if HAVE_CLANG
 # See http://blog.alexrp.com/2013/09/26/clangs-static-analyzer-and-automake/
-analyze_srcs = $(filter-out $(ck_SOURCES), $(filter %.c, $(libphenom_la_SOURCES)))
+analyze_srcs = $(filter %.c, $(libphenom_la_SOURCES))
 analyze_plists = $(analyze_srcs:%.c=%.plist)
 MOSTLYCLEANFILES = $(analyze_plists)
 
