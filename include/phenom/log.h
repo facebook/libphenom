@@ -68,6 +68,8 @@
 extern "C" {
 #endif
 
+#include <stdarg.h>
+
 #define PH_LOG_HOOK_NAME "phenom::log::ph_log"
 
 #define PH_LOG_PANIC    0
