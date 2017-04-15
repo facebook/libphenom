@@ -181,16 +181,13 @@ void ph_listener_set_backlog(ph_listener_t *lstn, int backlog)
 #endif
 #ifdef __linux__
   {
-    int fd = open("/proc/sys/net/core/somaxconn", O_RDONLY);
-    if (fd >= 0) {
-      char buf[32];
-      int x;
-
-      x = read(fd, buf, sizeof(buf));
-      if (x > 0) {
-        lstn->backlog = strtol(buf, 0, 10);
+    FILE *f = fopen("/proc/sys/net/core/somaxconn", "r");
+    if (f) {
+      int tmp;
+      if (fscanf(f, "%d", &tmp) == 1) {
+        lstn->backlog = tmp;
       }
-      close(fd);
+      fclose(f);
     }
   }
 #elif defined(HAVE_SYSCTLBYNAME)
