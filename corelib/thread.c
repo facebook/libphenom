@@ -116,7 +116,12 @@ static ph_thread_t *ph_thread_init_myself(bool booting)
   ph_thread_t *me;
   ck_epoch_record_t *er;
 
+#if CK_RELEASE_VERSION >= 600
+  er = ck_epoch_recycle(&misc_epoch, NULL);
+#else
   er = ck_epoch_recycle(&misc_epoch);
+#endif
+
   if (er) {
     me = ph_container_of(er, ph_thread_t, epoch_record);
   } else {
@@ -124,7 +129,13 @@ static ph_thread_t *ph_thread_init_myself(bool booting)
     if (!me) {
       ph_panic("fatal OOM in ph_thread_init_myself()");
     }
+
+#if CK_RELEASE_VERSION >= 600
+    ck_epoch_register(&misc_epoch, &me->epoch_record, NULL);
+#else
     ck_epoch_register(&misc_epoch, &me->epoch_record);
+#endif
+
     ck_stack_push_mpmc(&ph_thread_all_threads, &me->thread_linkage);
     ph_counter_init_thread(me);
   }
