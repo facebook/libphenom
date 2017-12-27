@@ -382,6 +382,9 @@ uint8_t ph_counter_scope_get_num_slots(
 struct ph_counter_scope_iterator {
   void *ptr;
   intptr_t offset;
+  #if CK_RELEASE_VERSION >= 600
+    void *map;
+  #endif
 };
 typedef struct ph_counter_scope_iterator ph_counter_scope_iterator_t;
 

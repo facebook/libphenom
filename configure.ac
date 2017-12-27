@@ -140,10 +140,15 @@ esac
 
 # If you're bumping the CK max-version here, you must also bump it in
 # travis/deps.sh otherwise you will break the CI build
-if ! $PKG_CONFIG --exists --atleast-version=0.5.0 --max-version=0.5.1 --print-errors ck ; then
+if ! $PKG_CONFIG --exists --atleast-version=0.5.0 --max-version=0.6.0 --print-errors ck ; then
   AC_MSG_ERROR([ck is required])
 fi
-CFLAGS="$CFLAGS `$PKG_CONFIG --cflags ck`"
+
+CK_VERSION=`$PKG_CONFIG --modversion ck`
+CK_MAJOR=`echo $CK_VERSION | cut -d. -f1`
+CK_MINOR=`echo $CK_VERSION | cut -d. -f2`
+CK_MICRO=`echo $CK_VERSION | cut -d. -f3`
+CFLAGS="$CFLAGS `$PKG_CONFIG --cflags ck` -DCK_RELEASE_VERSION=`expr \( $CK_MAJOR \* 1000 \) \+ \( $CK_MINOR \* 100 \) + \( $CK_MICRO \* 10 \)`"
 LIBS="$LIBS `pkg_config_libs ck`"
 
 AC_PATH_PROG(PHP, php, true)
