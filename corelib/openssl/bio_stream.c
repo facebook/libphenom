@@ -19,6 +19,12 @@
 #include "phenom/openssl.h"
 #include <openssl/bio.h>
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#define BIO_set_init(b, val) (b)->init = (val)
+#define BIO_set_data(b, val) (b)->ptr = (val)
+#define BIO_get_data(b) (b)->ptr
+#endif
+
 /* Implements an OpenSSL BIO that invokes phenom streams */
 
 static bool should_retry(ph_stream_t *stm)
@@ -33,10 +39,17 @@ static bool should_retry(ph_stream_t *stm)
   }
 }
 
+static void bio_stm_clear(BIO *h)
+{
+  BIO_set_init(h, 0);
+  BIO_set_data(h, NULL);
+  BIO_clear_flags(h, ~0);
+}
+
 static int bio_stm_write(BIO *h, const char *buf, int size)
 {
   uint64_t nwrote;
-  ph_stream_t *stm = h->ptr;
+  ph_stream_t *stm = BIO_get_data(h);
 
   if (buf == NULL || size == 0 || stm == NULL) {
     return 0;
@@ -62,7 +75,7 @@ static int bio_stm_puts(BIO *h, const char *str)
 static int bio_stm_read(BIO *h, char *buf, int size)
 {
   uint64_t nread;
-  ph_stream_t *stm = h->ptr;
+  ph_stream_t *stm = BIO_get_data(h);
 
   if (buf == NULL || size == 0 || stm == NULL) {
     return 0;
@@ -83,7 +96,7 @@ static int bio_stm_read(BIO *h, char *buf, int size)
 static long bio_stm_ctrl(BIO *h, int cmd, // NOLINT(runtime/int)
     long arg1, void *arg2)                // NOLINT(runtime/int)
 {
-  ph_stream_t *stm = h->ptr;
+  ph_stream_t *stm = BIO_get_data(h);
 
   switch (cmd) {
     case BIO_CTRL_FLUSH:
@@ -98,11 +111,7 @@ static long bio_stm_ctrl(BIO *h, int cmd, // NOLINT(runtime/int)
 
 static int bio_stm_new(BIO *h)
 {
-  h->init = 0;
-  h->num = 0;
-  h->ptr = NULL;
-  h->flags = 0;
-
+  bio_stm_clear(h);
   return 1;
 }
 
@@ -112,40 +121,56 @@ static int bio_stm_free(BIO *h)
     return 0;
   }
 
-  h->ptr = NULL;
-  h->init = 0;
-  h->flags = 0;
-
+  bio_stm_clear(h);
   return 1;
 }
 
-static BIO_METHOD method_stm = {
-  // There are no clear rules on how the type numbers are assigned, so we'll
-  // just pick 'P' as our type number and hope it doesn't collide any time
-  // soon.
-  80 /* 'P' */ | BIO_TYPE_SOURCE_SINK,
-  "phenom-stream",
-  bio_stm_write,
-  bio_stm_read,
-  bio_stm_puts,
-  NULL, /* no gets */
-  bio_stm_ctrl,
-  bio_stm_new,
-  bio_stm_free,
-  NULL, /* no callback ctrl */
-};
-
 BIO *ph_openssl_bio_wrap_stream(ph_stream_t *stm)
 {
-  BIO *h;
+  static BIO_METHOD *bm;
 
-  h = BIO_new(&method_stm);
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+  static BIO_METHOD old_meth = {
+    // There are no clear rules on how the type numbers are assigned, so we'll
+    // just pick 'P' as our type number and hope it doesn't collide any time
+    // soon.  TODO: consider using: BIO_TYPE_BIO | BIO_get_new_index ();
+    80 | BIO_TYPE_SOURCE_SINK,
+    "phenom-stream",
+    bio_stm_write,
+    bio_stm_read,
+    bio_stm_puts,
+    NULL, /* no gets */
+    bio_stm_ctrl,
+    bio_stm_new,
+    bio_stm_free,
+    NULL, /* no callback ctrl */
+  };
+
+  bm = &old_meth;
+#else
+  if (!bm) {
+    bm = BIO_meth_new(80 /* 'P' */ | BIO_TYPE_SOURCE_SINK, "phenom-stream");
+    if (!bm) {
+      return NULL;
+    }
+
+    BIO_meth_set_write(bm, bio_stm_write);
+    BIO_meth_set_read(bm, bio_stm_read);
+    BIO_meth_set_puts(bm, bio_stm_puts);
+    BIO_meth_set_ctrl(bm, bio_stm_ctrl);
+    BIO_meth_set_create(bm, bio_stm_new);
+    BIO_meth_set_destroy(bm, bio_stm_free);
+  }
+#endif
+
+  BIO *h = BIO_new(bm);
   if (!h) {
     return NULL;
   }
 
-  h->ptr = stm;
-  h->init = 1;
+  BIO_set_data(h, stm);
+  BIO_set_init(h, 1);
+
   return h;
 }
 

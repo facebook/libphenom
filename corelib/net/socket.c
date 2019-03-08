@@ -117,7 +117,7 @@ static void sock_dtor(ph_job_t *job)
     sock->sslwbuf = NULL;
   }
   if (sock->ssl) {
-    SSL_CTX *ctx = sock->ssl->ctx;
+    SSL_CTX *ctx = SSL_get_SSL_CTX(sock->ssl);
 
     if (sock->ssl_stream) {
       ph_stm_close(sock->ssl_stream);
