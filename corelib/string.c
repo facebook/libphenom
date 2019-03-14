@@ -61,6 +61,7 @@ ph_string_t *ph_string_make_slice(ph_string_t *str,
   }
 
   ph_string_init_slice(slice, str, start, len);
+  slice->onstack = false;
   return slice;
 }
 

@@ -140,7 +140,7 @@ esac
 
 # If you're bumping the CK max-version here, you must also bump it in
 # travis/deps.sh otherwise you will break the CI build
-if ! $PKG_CONFIG --exists --atleast-version=0.5.0 --max-version=0.5.1 --print-errors ck ; then
+if ! $PKG_CONFIG --exists --atleast-version=0.5.0 --max-version=0.6.0 --print-errors ck ; then
   AC_MSG_ERROR([ck is required])
 fi
 CFLAGS="$CFLAGS `$PKG_CONFIG --cflags ck`"
@@ -312,7 +312,7 @@ if test -n "$GCC" ; then
     -W -Wundef -Wendif-labels -Wshadow -Wpointer-arith -Wcast-align \
     -Wwrite-strings -Wstrict-prototypes -Wmissing-prototypes \
     -Wno-nested-externs -Winline -Wdisabled-optimization \
-    -fstrict-aliasing -pipe -Wno-parentheses"
+    -fstrict-aliasing -pipe -Wno-parentheses -Wno-varargs"
 fi
 AC_SUBST(PC_CFLAGS)
 AC_SUBST(PC_LIBS)

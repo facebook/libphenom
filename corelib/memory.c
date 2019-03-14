@@ -440,7 +440,6 @@ void *ph_mem_realloc(ph_memtype_t mt, void *ptr, uint64_t size)
 
   hdr = ptr;
   hdr--;
-  ptr = hdr;
 
   if (hdr->mt != mt) {
     memory_panic("ph_mem_realloc: hdr->mt %d != caller provided mt %d %s",
@@ -452,6 +451,7 @@ void *ph_mem_realloc(ph_memtype_t mt, void *ptr, uint64_t size)
     return ptr;
   }
 
+  ptr = hdr;
   hdr = realloc(ptr, size + HEADER_RESERVATION);
   if (!hdr) {
     ph_counter_scope_add(mem_type->scope,

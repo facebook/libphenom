@@ -17,6 +17,8 @@
 #ifndef PHENOM_HASHTABLE_H
 #define PHENOM_HASHTABLE_H
 
+#include "phenom/defs.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
