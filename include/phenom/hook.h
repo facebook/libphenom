@@ -118,7 +118,7 @@ static inline void ph_hook_invokev(ph_hook_point_t *hook,
  *
  * Each argument MUST be a pointer to the value in question
  */
-void ph_hook_invoke_vargs(ph_hook_point_t *hook, uint8_t nargs, ...);
+void ph_hook_invoke_vargs(ph_hook_point_t *hook, uint32_t nargs, ...);
 
 #define ph_hook_invoke(hook, nargs, ...) do { \
   ph_debug_assert(nargs < PH_HOOK_MAX_VARGS, "nargs too big"); \
